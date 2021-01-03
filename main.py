@@ -3,46 +3,61 @@ import agent2
 from copy import deepcopy
 import time
 
+CONSTRUCTOR_TIMEOUT = 60
 ACTION_TIMEOUT = 5
-
-MAP = [
-    [],
-    [],
-    [],
-]
 
 class Game:
     def __init__(self):
-        state, control_zone_1, control_zone_2 = self.divide_map()
-        agent_1 = agent1.Agent(control_zone_1)
-        agent_2 = agent2.Agent(control_zone_2)
+        self.state = None
+        self.control_zone_1 = None
+        self.control_zone_2 = None
+        self.agent_1 = None
+        self.agent_2 = None
+        self.divide_map()
+        self.initiate_agents()
+
+    def initiate_agents(self):
+        start = time.time()
+        self.agent_1 = agent1.Agent(self.control_zone_1)
+        if time.time() - start > CONSTRUCTOR_TIMEOUT:
+            self.handle_constructor_timeout(self.agent_1)
+        start = time.time()
+        self.agent_2 = agent2.Agent(self.control_zone_2)
+        if time.time() - start > CONSTRUCTOR_TIMEOUT:
+            self.handle_constructor_timeout(self.agent_2)
 
     def divide_map(self):
-        return {}, None, None
+        self.state = None
+        self.control_zone_1 = None
+        self.control_zone_2 = None
 
-    def get_action(self, agent, state):
+    def get_action(self, agent):
         start = time.time()
-        action = agent1.act(state)
+        action = agent.act(self.state)
         if time.time() - start > ACTION_TIMEOUT:
-            self.handle_timeout(agent)
+            self.handle_action_timeout(agent)
+        return action
 
-
-    def handle_timeout(self, agent):
+    def check_if_action_legal(self, action):
         pass
 
+    def apply_action(self, action):
+        self.check_if_action_legal(action)
 
-    def play_episode(self, state, agent1, agent2):
-        while 'S' in state.values():
+    def handle_action_timeout(self, agent):
+        pass
 
+    def handle_constructor_timeout(self, agent):
+        pass
+
+    def play_episode(self):
+        while 'S' in self.state.values():
+            action_1 = self.get_action(self.agent_1)
+            action_2 = self.get_action(self.agent_2)
 
 
 def main():
-
-
-    play_episode(deepcopy(state), agent1, agent2)
-
-
-
+    game = Game()
 
 
 if __name__ == '__main__':
