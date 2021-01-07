@@ -10,6 +10,7 @@ ACTION_TIMEOUT = 5
 def state_to_agent(state):
     pass
 
+# meaningless comment
 
 class Game:
     def __init__(self):
