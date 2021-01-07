@@ -12,6 +12,7 @@ def state_to_agent(state):
 
 # meaningless comment
 
+
 class Game:
     def __init__(self):
         self.initial_state = None
