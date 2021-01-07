@@ -10,9 +10,6 @@ ACTION_TIMEOUT = 5
 def state_to_agent(state):
     pass
 
-# meaningless comment
-# some more comment
-# stuff and stuff
 
 class Game:
     def __init__(self):
@@ -57,8 +54,7 @@ class Game:
     def check_if_action_legal(self, action):
         if len(action) > 3:
             return False
-        vaccine_count = 0
-        quarantine_count = 0
+        count = {'vaccinate': 0, 'quarantine': 0}
         for atomic_action in action:
             location, effect = atomic_action[1], atomic_action[0]
             try:
@@ -66,6 +62,9 @@ class Game:
             except KeyError:
                 return False
             if effect.lower() not in ['vaccinate', 'quarantine']:
+                return False
+            count[effect] += 1
+            if count['vaccinate'] > 1 or count['quarantine'] > 2:
                 return False
 
         return True
