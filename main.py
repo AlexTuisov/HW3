@@ -29,24 +29,24 @@ class Game:
     def __init__(self, a_map):
         self.ids = [hw3.ids, sample_agent.ids]
         self.initial_state = pad_the_input(a_map)
+        self.state = deepcopy(self.initial_state)
         self.control_zone_1 = None
         self.control_zone_2 = None
         self.divide_map()
         self.score = [0, 0]
         self.agents = []
-        self.state = deepcopy(self.initial_state)
 
     def state_to_agent(self):
         state_as_list = []
         for i in range(DIMENSIONS[0]):
-            state_as_list.append([])
+            state_as_list.append([]*DIMENSIONS[1])
             for j in range(DIMENSIONS[1]):
-                state_as_list[i][j] = self.state[(i + 1, j + 1)][0]
+                state_as_list[i].append(self.state[(i + 1, j + 1)][0])
         return state_as_list
 
     def initiate_agent(self, module, control_zone, first):
         start = time.time()
-        control_zone_to_agent = [(i -1, j - 1) for (i, j) in control_zone]
+        control_zone_to_agent = [(i - 1, j - 1) for (i, j) in control_zone]
         agent = module.Agent(control_zone_to_agent, first)
         if time.time() - start > CONSTRUCTOR_TIMEOUT:
             self.handle_constructor_timeout(module.ids)
@@ -58,7 +58,7 @@ class Game:
                                              range(1, DIMENSIONS[1] + 1)) if 'U' not in self.state[(i, j)]]
         random.shuffle(habitable_tiles)
 
-        half = len(habitable_tiles)//2
+        half = len(habitable_tiles) // 2
         self.control_zone_1 = set(habitable_tiles[:half])
         self.control_zone_2 = set(habitable_tiles[half:])
         assert len(self.control_zone_1) == len(self.control_zone_2)
@@ -72,7 +72,7 @@ class Game:
             return False
         count = {'vaccinate': 0, 'quarantine': 0}
         for atomic_action in action:
-            location, effect = atomic_action[1], atomic_action[0]
+            effect, location = atomic_action[0], atomic_action[1]
             try:
                 status = self.state[location]
             except KeyError:
@@ -91,7 +91,7 @@ class Game:
 
     def apply_action(self, actions):
         for action in actions:
-            location, effect = action[1], action[0]
+            effect, location = action[0], action[1]
             if 'v' in effect:
                 self.state[location] = 'I'
             else:
@@ -199,15 +199,24 @@ class Game:
 
 
 def main():
-    a_map = []
+    a_map = [
+        ['H', 'S', 'S', 'H', 'H', 'H', 'U', 'S', 'H', 'H'],
+        ['H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+        ['H', 'U', 'U', 'H', 'H', 'U', 'H', 'H', 'H', 'H'],
+        ['H', 'H', 'U', 'H', 'S', 'U', 'H', 'H', 'U', 'H'],
+        ['H', 'H', 'U', 'H', 'H', 'U', 'H', 'H', 'S', 'H'],
+        ['S', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H', 'H'],
+        ['H', 'H', 'H', 'S', 'U', 'U', 'H', 'H', 'H', 'U'],
+        ['H', 'U', 'H', 'H', 'U', 'H', 'H', 'H', 'U', 'H'],
+        ['H', 'H', 'U', 'H', 'H', 'U', 'H', 'S', 'U', 'H'],
+        ['H', 'H', 'H', 'H', 'S', 'H', 'H', 'H', 'H', 'H'],
+    ]
     assert len(a_map) == DIMENSIONS[0]
     assert len(a_map[0]) == DIMENSIONS[1]
     game = Game(a_map)
-    try:
-        results = game.play_game()
-        print(f'Score for {hw3.ids} is {results[0]}, score for {sample_agent.ids} is {results[1]}')
-    except Exception as e:
-        print(e)
+    results = game.play_game()
+    print(f'Score for {hw3.ids} is {results[0]}, score for {sample_agent.ids} is {results[1]}')
+
 
 
 if __name__ == '__main__':
