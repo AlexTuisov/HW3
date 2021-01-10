@@ -69,7 +69,9 @@ class Game:
         action = agent.act(self.state_to_agent())
         return action
 
-    def check_if_action_legal(self, action):
+    def check_if_action_legal(self, action, zone_of_control):
+        if not action:
+            return False
         if len(action) > 3:
             return False
         count = {'vaccinate': 0, 'quarantine': 0}
@@ -87,6 +89,8 @@ class Game:
             if effect == 'vaccinate' and 'H' not in status:
                 return False
             if effect == 'quarantine' and 'S' not in status:
+                return False
+            if location not in zone_of_control:
                 return False
 
         return True
@@ -143,9 +147,9 @@ class Game:
                 self.score[player] -= 5
 
     def handle_constructor_timeout(self, agent):
-        pass
+        raise Exception
 
-    def get_legal_action(self, number_of_agent):
+    def get_legal_action(self, number_of_agent, zoc):
         start = time.time()
         action = self.get_action(self.agents[number_of_agent])
         finish = time.time()
@@ -153,7 +157,7 @@ class Game:
             self.score[number_of_agent] -= PENALTY
             print(f'agent of {self.ids[number_of_agent]} timed out on action!')
             return []
-        if not self.check_if_action_legal(action):
+        if not self.check_if_action_legal(action, zoc):
             self.score[number_of_agent] -= PENALTY
             print(f'agent of {self.ids[number_of_agent]} chose illegal action!')
             return []
@@ -168,27 +172,26 @@ class Game:
                 print(line)
             print()
 
-
             if not swapped:
-                action = self.get_legal_action(0)
+                action = self.get_legal_action(0, self.control_zone_1)
                 if not action:
                     return
                 self.apply_action(action)
                 print(f'player {self.ids[0]} uses {action}!')
 
-                action = self.get_legal_action(1)
+                action = self.get_legal_action(1, self.control_zone_2)
                 if not action:
                     return
                 self.apply_action(action)
                 print(f'player {self.ids[1]} uses {action}!')
             else:
-                action = self.get_legal_action(1)
+                action = self.get_legal_action(1, self.control_zone_1)
                 if not action:
                     return
                 self.apply_action(action)
                 print(f'player {self.ids[1]} uses {action}!')
 
-                action = self.get_legal_action(0)
+                action = self.get_legal_action(0, self.control_zone_2)
                 if not action:
                     return
                 self.apply_action(action)
