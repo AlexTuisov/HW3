@@ -1,3 +1,5 @@
+import itertools
+
 import hw3
 import sample_agent
 from copy import deepcopy
@@ -5,6 +7,7 @@ import time
 
 CONSTRUCTOR_TIMEOUT = 60
 ACTION_TIMEOUT = 5
+DIMENSIONS = (10, 10)
 
 
 def state_to_agent(state):
@@ -13,31 +16,38 @@ def state_to_agent(state):
 
 class Game:
     def __init__(self):
+        self.ids = [hw3.ids, sample_agent.ids]
         self.initial_state = None
         self.control_zone_1 = None
         self.control_zone_2 = None
-        self.score = [0, 0]
-        self.agents = {hw3.ids: None,
-                       sample_agent.ids: None}
         self.divide_map()
+        self.score = [0, 0]
+        self.agents = []
         self.state = deepcopy(self.initial_state)
 
-    def initiate_agents(self, control_zone_1, control_zone_2, swap=False):
-        if swap:
-            control_zone_1, control_zone_2 = control_zone_2, control_zone_1
-        start = time.time()
-        agent_1 = hw3.Agent(control_zone_1, 'first')
-        if time.time() - start > CONSTRUCTOR_TIMEOUT:
-            self.handle_constructor_timeout(agent_1)
+    # def initiate_agents(self, control_zone_1, control_zone_2, swap=False):
+    #     if swap:
+    #         control_zone_1, control_zone_2 = control_zone_2, control_zone_1
+    #     start = time.time()
+    #     agent_1 = hw3.Agent(control_zone_1, 'first')
+    #     if time.time() - start > CONSTRUCTOR_TIMEOUT:
+    #         self.handle_constructor_timeout(agent_1)
+    #
+    #     start = time.time()
+    #     agent_2 = sample_agent.Agent(control_zone_2, 'second')
+    #     if time.time() - start > CONSTRUCTOR_TIMEOUT:
+    #         self.handle_constructor_timeout(agent_2)
+    #
+    #     if swap:
+    #         return agent_2, agent_1
+    #     return agent_1, agent_2
 
+    def initiate_agent(self, module, control_zone, first):
         start = time.time()
-        agent_2 = sample_agent.Agent(control_zone_2, 'second')
+        agent = module.Agent(control_zone, first)
         if time.time() - start > CONSTRUCTOR_TIMEOUT:
-            self.handle_constructor_timeout(agent_2)
-
-        if swap:
-            return agent_2, agent_1
-        return agent_1, agent_2
+            self.handle_constructor_timeout(module.ids)
+        return agent
 
     def divide_map(self):
         self.initial_state = None
@@ -78,7 +88,36 @@ class Game:
                 self.state[location] = 'Q0'
 
     def change_state(self):
-        pass
+        new_state = deepcopy(self.state)
+
+        # virus spread
+        for i in range(1, DIMENSIONS[0] + 1):
+            for j in range(1, DIMENSIONS[1] + 1):
+                if self.state[(i, j)] == 'H' and ('S' in self.state[(i - 1, j)] or
+                                                  'S' in self.state[(i + 1, j)] or
+                                                  'S' in self.state[(i, j - 1)] or
+                                                  'S' in self.state[(i, j + 1)]):
+                    new_state[(i, j)] = 'S0'
+
+        # advancing the sickness
+        for i in range(1, DIMENSIONS[0] + 1):
+            for j in range(1, DIMENSIONS[1] + 1):
+                if 'S' in self.state[(i, j)]:
+                    turn = int(self.state[(i, j)][1])
+                    if turn < 3:
+                        new_state[(i, j)] = 'S' + str(turn + 1)
+                    else:
+                        new_state[(i, j)] = 'H'
+
+                # quarantine expires
+                if 'Q' in self.state[(i, j)]:
+                    turn = int(self.state[(i, j)][1])
+                    if turn < 2:
+                        new_state[(i, j)] = 'Q' + str(turn + 1)
+                    else:
+                        new_state[(i, j)] = 'H'
+
+        self.state = new_state
 
     def update_scores(self):
         pass
@@ -93,23 +132,28 @@ class Game:
         pass
 
     def play_game(self):
-        agent_1, agent_2 = self.initiate_agents(self.control_zone_1, self.control_zone_2)
-        self.play_episode(agent_1, agent_2)
+        self.agents = [self.initiate_agent(hw3, self.control_zone_1, 'first'),
+                       self.initiate_agent(sample_agent, self.control_zone_2, 'second')]
+        self.play_episode()
 
         self.state = deepcopy(self.initial_state)
 
-        agent_1, agent_2 = self.initiate_agents(self.control_zone_1, self.control_zone_2, swap=True)
-        self.play_episode(agent_1, agent_2)
+        self.agents = [self.initiate_agent(hw3, self.control_zone_2, 'second'),
+                       self.initiate_agent(sample_agent, self.control_zone_1, 'first')]
+
+        self.play_episode(swapped=True)
         return self.score
 
-    def play_episode(self, agent_1, agent_2):
+    def play_episode(self, swapped=False):
         while 'S' in self.state.values():
-            action_1 = self.get_action(agent_1)
+            action_1 = self.get_action(self.agents[0])
             if not self.check_if_action_legal(action_1):
                 self.handle_illegal_action(agent_1)
             action_2 = self.get_action(agent_2)
             if not self.check_if_action_legal(action_2):
                 self.handle_illegal_action(agent_2)
+            if swapped:
+                self.apply_action()
             self.apply_action([action_1, action_2])
             self.change_state()
             self.update_scores()
@@ -126,5 +170,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
