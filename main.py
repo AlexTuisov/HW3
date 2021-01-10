@@ -20,6 +20,8 @@ def pad_the_input(a_map):
         for j in range(0, new_j_dim):
             if i == 0 or j == 0 or i == new_i_dim - 1 or j == new_j_dim - 1:
                 state[(i, j)] = 'U'
+            elif 'S' in a_map[i - 1][j - 1]:
+                state[(i, j)] = 'S1'
             else:
                 state[(i, j)] = a_map[i - 1][j - 1]
     return state
@@ -72,7 +74,7 @@ class Game:
             return False
         count = {'vaccinate': 0, 'quarantine': 0}
         for atomic_action in action:
-            effect, location = atomic_action[0], atomic_action[1]
+            effect, location = atomic_action[0], (atomic_action[1][0] + 1, atomic_action[1][1] + 1)
             try:
                 status = self.state[location]
             except KeyError:
@@ -90,8 +92,8 @@ class Game:
         return True
 
     def apply_action(self, actions):
-        for action in actions:
-            effect, location = action[0], action[1]
+        for atomic_action in actions:
+            effect, location = atomic_action[0], (atomic_action[1][0] + 1, atomic_action[1][1] + 1)
             if 'v' in effect:
                 self.state[location] = 'I'
             else:
@@ -129,14 +131,16 @@ class Game:
 
         self.state = new_state
 
-    def update_scores(self):
-        for (i, j) in self.control_zone_1:
+    def update_scores(self, player, control_zone):
+        for (i, j) in control_zone:
             if 'H' in self.state[(i, j)]:
-                self.score[0] += 1
+                self.score[player] += 1
+            if 'I' in self.state[(i, j)]:
+                self.score[player] += 1
             if 'S' in self.state[(i, j)]:
-                self.score[0] -= 1
+                self.score[player] -= 1
             if 'Q' in self.state[(i, j)]:
-                self.score[0] -= 5
+                self.score[player] -= 5
 
     def handle_constructor_timeout(self, agent):
         pass
@@ -156,38 +160,56 @@ class Game:
         return action
 
     def play_episode(self, swapped=False):
-        while 'S' in self.state.values():
+
+        while 'S1' in self.state.values() or 'S2' in self.state.values() or 'S3' in self.state.values():
+
+            obs_state = self.state_to_agent()
+            for line in obs_state:
+                print(line)
+            print()
+
+
             if not swapped:
                 action = self.get_legal_action(0)
                 if not action:
                     return
                 self.apply_action(action)
+                print(f'player {self.ids[0]} uses {action}!')
 
                 action = self.get_legal_action(1)
                 if not action:
                     return
                 self.apply_action(action)
+                print(f'player {self.ids[1]} uses {action}!')
             else:
                 action = self.get_legal_action(1)
                 if not action:
                     return
                 self.apply_action(action)
+                print(f'player {self.ids[1]} uses {action}!')
 
                 action = self.get_legal_action(0)
                 if not action:
                     return
                 self.apply_action(action)
+                print(f'player {self.ids[0]} uses {action}!')
 
             self.change_state()
-            self.update_scores()
+            if not swapped:
+                self.update_scores(0, self.control_zone_1)
+                self.update_scores(1, self.control_zone_2)
+            else:
+                self.update_scores(1, self.control_zone_1)
+                self.update_scores(0, self.control_zone_2)
+            print('------')
 
     def play_game(self):
-        print(f'starting a first round!')
+        print(f'***********  starting a first round!  ************ \n \n')
         self.agents = [self.initiate_agent(hw3, self.control_zone_1, 'first'),
                        self.initiate_agent(sample_agent, self.control_zone_2, 'second')]
         self.play_episode()
 
-        print(f'starting a second round!')
+        print(f'***********  starting a second round!  ************ \n \n')
         self.state = deepcopy(self.initial_state)
 
         self.agents = [self.initiate_agent(hw3, self.control_zone_2, 'second'),
@@ -216,7 +238,6 @@ def main():
     game = Game(a_map)
     results = game.play_game()
     print(f'Score for {hw3.ids} is {results[0]}, score for {sample_agent.ids} is {results[1]}')
-
 
 
 if __name__ == '__main__':
