@@ -1,4 +1,5 @@
 import itertools
+import random
 
 import hw3
 import sample_agent
@@ -8,16 +9,26 @@ import time
 CONSTRUCTOR_TIMEOUT = 60
 ACTION_TIMEOUT = 5
 DIMENSIONS = (10, 10)
+PENALTY = 1000
 
 
-def state_to_agent(state):
-    pass
+def pad_the_input(a_map):
+    state = {}
+    new_i_dim = DIMENSIONS[0] + 2
+    new_j_dim = DIMENSIONS[1] + 2
+    for i in range(0, new_i_dim):
+        for j in range(0, new_j_dim):
+            if i == 0 or j == 0 or i == new_i_dim - 1 or j == new_j_dim - 1:
+                state[(i, j)] = 'U'
+            else:
+                state[(i, j)] = a_map[i - 1][j - 1]
+    return state
 
 
 class Game:
-    def __init__(self):
+    def __init__(self, a_map):
         self.ids = [hw3.ids, sample_agent.ids]
-        self.initial_state = None
+        self.initial_state = pad_the_input(a_map)
         self.control_zone_1 = None
         self.control_zone_2 = None
         self.divide_map()
@@ -25,40 +36,35 @@ class Game:
         self.agents = []
         self.state = deepcopy(self.initial_state)
 
-    # def initiate_agents(self, control_zone_1, control_zone_2, swap=False):
-    #     if swap:
-    #         control_zone_1, control_zone_2 = control_zone_2, control_zone_1
-    #     start = time.time()
-    #     agent_1 = hw3.Agent(control_zone_1, 'first')
-    #     if time.time() - start > CONSTRUCTOR_TIMEOUT:
-    #         self.handle_constructor_timeout(agent_1)
-    #
-    #     start = time.time()
-    #     agent_2 = sample_agent.Agent(control_zone_2, 'second')
-    #     if time.time() - start > CONSTRUCTOR_TIMEOUT:
-    #         self.handle_constructor_timeout(agent_2)
-    #
-    #     if swap:
-    #         return agent_2, agent_1
-    #     return agent_1, agent_2
+    def state_to_agent(self):
+        state_as_list = []
+        for i in range(DIMENSIONS[0]):
+            state_as_list.append([])
+            for j in range(DIMENSIONS[1]):
+                state_as_list[i][j] = self.state[(i + 1, j + 1)][0]
+        return state_as_list
 
     def initiate_agent(self, module, control_zone, first):
         start = time.time()
-        agent = module.Agent(control_zone, first)
+        control_zone_to_agent = [(i -1, j - 1) for (i, j) in control_zone]
+        agent = module.Agent(control_zone_to_agent, first)
         if time.time() - start > CONSTRUCTOR_TIMEOUT:
             self.handle_constructor_timeout(module.ids)
         return agent
 
     def divide_map(self):
-        self.initial_state = None
-        self.control_zone_1 = None
-        self.control_zone_2 = None
+        habitable_tiles = [(i, j) for i, j in
+                           itertools.product(range(1, DIMENSIONS[0] + 1),
+                                             range(1, DIMENSIONS[1] + 1)) if 'U' not in self.state[(i, j)]]
+        random.shuffle(habitable_tiles)
+
+        half = len(habitable_tiles)//2
+        self.control_zone_1 = set(habitable_tiles[:half])
+        self.control_zone_2 = set(habitable_tiles[half:])
+        assert len(self.control_zone_1) == len(self.control_zone_2)
 
     def get_action(self, agent):
-        start = time.time()
-        action = agent.act(self.state)
-        if time.time() - start > ACTION_TIMEOUT:
-            self.handle_action_timeout(agent)
+        action = agent.act(self.state_to_agent())
         return action
 
     def check_if_action_legal(self, action):
@@ -75,6 +81,10 @@ class Game:
                 return False
             count[effect] += 1
             if count['vaccinate'] > 1 or count['quarantine'] > 2:
+                return False
+            if effect == 'vaccinate' and 'H' not in status:
+                return False
+            if effect == 'quarantine' and 'S' not in status:
                 return False
 
         return True
@@ -99,7 +109,7 @@ class Game:
                                                   'S' in self.state[(i, j + 1)]):
                     new_state[(i, j)] = 'S0'
 
-        # advancing the sickness
+        # advancing sick counters
         for i in range(1, DIMENSIONS[0] + 1):
             for j in range(1, DIMENSIONS[1] + 1):
                 if 'S' in self.state[(i, j)]:
@@ -109,7 +119,7 @@ class Game:
                     else:
                         new_state[(i, j)] = 'H'
 
-                # quarantine expires
+                # advancing quarantine counters
                 if 'Q' in self.state[(i, j)]:
                     turn = int(self.state[(i, j)][1])
                     if turn < 2:
@@ -120,47 +130,79 @@ class Game:
         self.state = new_state
 
     def update_scores(self):
-        pass
-
-    def handle_illegal_action(self, agent):
-        pass
-
-    def handle_action_timeout(self, agent):
-        pass
+        for (i, j) in self.control_zone_1:
+            if 'H' in self.state[(i, j)]:
+                self.score[0] += 1
+            if 'S' in self.state[(i, j)]:
+                self.score[0] -= 1
+            if 'Q' in self.state[(i, j)]:
+                self.score[0] -= 5
 
     def handle_constructor_timeout(self, agent):
         pass
 
+    def get_legal_action(self, number_of_agent):
+        start = time.time()
+        action = self.get_action(self.agents[number_of_agent])
+        finish = time.time()
+        if finish - start > ACTION_TIMEOUT:
+            self.score[number_of_agent] -= PENALTY
+            print(f'agent of {self.ids[number_of_agent]} timed out on action!')
+            return []
+        if not self.check_if_action_legal(action):
+            self.score[number_of_agent] -= PENALTY
+            print(f'agent of {self.ids[number_of_agent]} chose illegal action!')
+            return []
+        return action
+
+    def play_episode(self, swapped=False):
+        while 'S' in self.state.values():
+            if not swapped:
+                action = self.get_legal_action(0)
+                if not action:
+                    return
+                self.apply_action(action)
+
+                action = self.get_legal_action(1)
+                if not action:
+                    return
+                self.apply_action(action)
+            else:
+                action = self.get_legal_action(1)
+                if not action:
+                    return
+                self.apply_action(action)
+
+                action = self.get_legal_action(0)
+                if not action:
+                    return
+                self.apply_action(action)
+
+            self.change_state()
+            self.update_scores()
+
     def play_game(self):
+        print(f'starting a first round!')
         self.agents = [self.initiate_agent(hw3, self.control_zone_1, 'first'),
                        self.initiate_agent(sample_agent, self.control_zone_2, 'second')]
         self.play_episode()
 
+        print(f'starting a second round!')
         self.state = deepcopy(self.initial_state)
 
         self.agents = [self.initiate_agent(hw3, self.control_zone_2, 'second'),
                        self.initiate_agent(sample_agent, self.control_zone_1, 'first')]
 
         self.play_episode(swapped=True)
+        print(f'end of game!')
         return self.score
-
-    def play_episode(self, swapped=False):
-        while 'S' in self.state.values():
-            action_1 = self.get_action(self.agents[0])
-            if not self.check_if_action_legal(action_1):
-                self.handle_illegal_action(agent_1)
-            action_2 = self.get_action(agent_2)
-            if not self.check_if_action_legal(action_2):
-                self.handle_illegal_action(agent_2)
-            if swapped:
-                self.apply_action()
-            self.apply_action([action_1, action_2])
-            self.change_state()
-            self.update_scores()
 
 
 def main():
-    game = Game()
+    a_map = []
+    assert len(a_map) == DIMENSIONS[0]
+    assert len(a_map[0]) == DIMENSIONS[1]
+    game = Game(a_map)
     try:
         results = game.play_game()
         print(f'Score for {hw3.ids} is {results[0]}, score for {sample_agent.ids} is {results[1]}')
