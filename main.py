@@ -113,7 +113,7 @@ class Game:
                                                   'S' in self.state[(i + 1, j)] or
                                                   'S' in self.state[(i, j - 1)] or
                                                   'S' in self.state[(i, j + 1)]):
-                    new_state[(i, j)] = 'S0'
+                    new_state[(i, j)] = 'S1'
 
         # advancing sick counters
         for i in range(1, DIMENSIONS[0] + 1):
