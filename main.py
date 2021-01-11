@@ -49,7 +49,7 @@ class Game:
     def initiate_agent(self, module, control_zone, first):
         start = time.time()
         control_zone_to_agent = [(i - 1, j - 1) for (i, j) in control_zone]
-        agent = module.Agent(control_zone_to_agent, first)
+        agent = module.Agent(self.state_to_agent(), control_zone_to_agent, first)
         if time.time() - start > CONSTRUCTOR_TIMEOUT:
             self.handle_constructor_timeout(module.ids)
         return agent

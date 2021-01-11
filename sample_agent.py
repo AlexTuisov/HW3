@@ -4,7 +4,7 @@ ids = ['AI']
 
 
 class Agent:
-    def __init__(self, zone_of_control, order):
+    def __init__(self, initial_state, zone_of_control, order):
         self.zoc = zone_of_control
 
     def act(self, state):
