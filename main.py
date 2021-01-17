@@ -70,8 +70,8 @@ class Game:
         return action
 
     def check_if_action_legal(self, action, zone_of_control):
-        if not action:
-            return False
+        # if not action:
+        #     return False
         if len(action) > 3:
             return False
         count = {'vaccinate': 0, 'quarantine': 0}
